@@ -22,10 +22,10 @@ public class Parser {
     private Student[] studentData;
     private RandomAccessFile input;
     private RandomAccessFile output;
+    int testCounter = 0;
     
     public Parser(String recordFile, String studentFile) throws Exception {
 
-        
         inputBuffer = new byte[blockSize];
         outputBuffer = new byte[blockSize];
         //open byte file
@@ -44,13 +44,15 @@ public class Parser {
                 Record temp = new Record(Arrays.copyOfRange(inputBuffer, lBound, rBound));
                 lBound += 16;
                 rBound += 16;
+                System.out.println(temp);
                 maxHeap.insert(temp);
             }
             full = input.read(inputBuffer);
         }
-        
+        boolean atLeast8blocks = false;
         //replacement selection
         while(full != -1) {
+            atLeast8blocks = true;
             int lBound = 0;
             int rBound = 16;
             Record curr;
@@ -79,26 +81,36 @@ public class Parser {
             full = input.read(inputBuffer);
         }
         
-        //no more values to process in input buffer, pop everything
-        int hiddenElems = 8192 - maxHeap.heapsize();
         while(maxHeap.heapsize() > 0) {
             Record currMax = (Record)maxHeap.removemax();
+            testCounter++;
             toOutputBuffer(currMax);
         }
         
-        //unhide arbitray #of hidden objects
-        
-        if(hiddenElems > 0) {
-            maxHeap.unhide(hiddenElems);
-            while(maxHeap.heapsize() > 0) {
-                Record currMax = (Record)maxHeap.removemax();
-                toOutputBuffer(currMax);
+        if(atLeast8blocks) {
+            int hiddenElems = 8192 - maxHeap.heapsize();
+            //unhide arbitray #of hidden objects
+            if(hiddenElems > 0) {
+                maxHeap.unhide(hiddenElems);
+                while(maxHeap.heapsize() > 0) {
+                    Record currMax = (Record)maxHeap.removemax();
+                    toOutputBuffer(currMax);
+                }
             }
         }
+        
+        
+        
+        
+        
+        
+        
+        
     }
     
     
     private void toOutputBuffer(Record x) throws IOException{
+        System.out.println(x);
         if (currOutputIndex < blockSize) {
             byte[] record = x.toBytes();
             for(int i = 0; i < record.length; i++) {
