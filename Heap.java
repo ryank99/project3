@@ -61,8 +61,10 @@ void insert(Comparable key) {
 // Heapify contents of Heap
 void buildheap()
  { 
-    for (int i=n/2-1; i>=0; i--)
+    for (int i=n/2-1; i>=0; i--) {
         siftdown(i);
+        update(i);
+    }
  }
 
 // Put element in its correct place
@@ -133,8 +135,8 @@ void modify(int pos, Comparable newVal) {
 
 public String toString() {
     String ret = "Heap: [";
-    for (int i = 0; i < n; i++) {
-        ret+= " " + Heap[i] + ",";
+    for (int i = 0; i < 20; i++) {
+        ret+= " " + Heap[i] + "\n";
     }
     return ret + "]";
 }

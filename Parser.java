@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.PrintWriter;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -24,16 +25,22 @@ public class Parser {
     private RandomAccessFile output;
     int testCounter = 0;
     
+    private PrintWriter writer;
+    
     public Parser(String recordFile, String studentFile) throws Exception {
 
         inputBuffer = new byte[blockSize];
         outputBuffer = new byte[blockSize];
         //open byte file
         input = new RandomAccessFile(new File(recordFile), "rw");
+        //input = new RandomAccessFile(new File("output.bin"), "rw");
         output = new RandomAccessFile(new File("output.bin"), "rw");
+        
+        //for testing
+        writer = new PrintWriter("file.txt", "UTF-8");
+
         maxHeap = new MaxHeap(new Record[8192], 0, 8192);
         int full = 0;
-        
         runs = new ArrayList<RunData>();
         full = input.read(inputBuffer);
         //fill maxheap initially
@@ -44,28 +51,27 @@ public class Parser {
                 Record temp = new Record(Arrays.copyOfRange(inputBuffer, lBound, rBound));
                 lBound += 16;
                 rBound += 16;
-                System.out.println(temp);
                 maxHeap.insert(temp);
             }
             full = input.read(inputBuffer);
         }
         boolean atLeast8blocks = false;
+        
         //replacement selection
+        
         while(full != -1) {
             atLeast8blocks = true;
             int lBound = 0;
             int rBound = 16;
             Record curr;
             for(int i = 0; i < 1024; i++) {
-                
                 Record temp = new Record(Arrays.copyOfRange(inputBuffer, lBound, rBound));
                 lBound += 16;
                 rBound += 16;
-                
                 curr = (Record)maxHeap.removemax();
                 toOutputBuffer(curr);
                 
-                if(temp.compareTo(curr) < 0) {
+                if(temp.compareTo(curr) > 0) {
                     maxHeap.hide(temp);
                 }
                 else {
@@ -74,6 +80,7 @@ public class Parser {
                 
                 //check if all hidden values
                 if(maxHeap.heapsize() == 0) {
+                    testCounter = 0;
                     maxHeap.unhide();
                 }
                 
@@ -83,15 +90,14 @@ public class Parser {
         
         while(maxHeap.heapsize() > 0) {
             Record currMax = (Record)maxHeap.removemax();
-            testCounter++;
             toOutputBuffer(currMax);
         }
-        
         if(atLeast8blocks) {
             int hiddenElems = 8192 - maxHeap.heapsize();
             //unhide arbitray #of hidden objects
             if(hiddenElems > 0) {
                 maxHeap.unhide(hiddenElems);
+                maxHeap.buildheap();
                 while(maxHeap.heapsize() > 0) {
                     Record currMax = (Record)maxHeap.removemax();
                     toOutputBuffer(currMax);
@@ -102,21 +108,17 @@ public class Parser {
         
         
         
-        
-        
-        
-        
     }
     
     
     private void toOutputBuffer(Record x) throws IOException{
-        System.out.println(x);
+        testCounter++;
+        writer.println(x);
         if (currOutputIndex < blockSize) {
-            byte[] record = x.toBytes();
+            byte[] record = x.toBytes();            
             for(int i = 0; i < record.length; i++) {
                outputBuffer[currOutputIndex+i] = record[i];
             }
-            //System.arraycopy(x.toBytes(), 0, outputBuffer, currOutputIndex, outputBuffer.length); 
             currOutputIndex+=16;
         }
         else {
