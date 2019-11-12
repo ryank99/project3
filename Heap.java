@@ -23,6 +23,10 @@ boolean isLeaf(int pos)
     return (pos >= n/2) && (pos < n);
 }
 
+public void emptyHeap() {
+    n = 0; 
+}
+
 // Return position for left child of pos
 int leftchild(int pos) {
  if (pos >= n/2) return -1;
@@ -63,7 +67,6 @@ void buildheap()
  { 
     for (int i=n/2-1; i>=0; i--) {
         siftdown(i);
-        update(i);
     }
  }
 

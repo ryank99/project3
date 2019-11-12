@@ -3,6 +3,7 @@ import java.util.Arrays;
 public class Record implements Comparable {
     private long pid;
     private double aScore;
+    private int flag;
     
     public Record(long p, double s) {
         pid = p;
@@ -14,6 +15,18 @@ public class Record implements Comparable {
         byte[] a = Arrays.copyOfRange(data, 8, 16);
         pid = Parser.bytesToLong(p);
         aScore = Parser.bytesToDouble(a);
+    }
+    
+    public Record(byte[] data, int f) {
+        byte[] p = Arrays.copyOfRange(data, 0, 8);
+        byte[] a = Arrays.copyOfRange(data, 8, 16);
+        pid = Parser.bytesToLong(p);
+        aScore = Parser.bytesToDouble(a);
+        flag = f;
+    }
+    
+    public int getFlag() {
+        return flag;
     }
     
     public long getPid() {

@@ -24,6 +24,7 @@ public class Parser {
     private RandomAccessFile input;
     private RandomAccessFile output;
     int testCounter = 0;
+    private RandomAccessFile currFile;
     
     private PrintWriter writer;
     
@@ -35,7 +36,6 @@ public class Parser {
         input = new RandomAccessFile(new File(recordFile), "rw");
         //input = new RandomAccessFile(new File("output.bin"), "rw");
         output = new RandomAccessFile(new File("output.bin"), "rw");
-        
         //for testing
         writer = new PrintWriter("file.txt", "UTF-8");
 
@@ -58,7 +58,7 @@ public class Parser {
         boolean atLeast8blocks = false;
         
         //replacement selection
-        
+        int hiddenVals = 0;
         while(full != -1) {
             atLeast8blocks = true;
             int lBound = 0;
@@ -72,6 +72,7 @@ public class Parser {
                 toOutputBuffer(curr);
                 
                 if(temp.compareTo(curr) > 0) {
+                    hiddenVals++;
                     maxHeap.hide(temp);
                 }
                 else {
@@ -79,9 +80,10 @@ public class Parser {
                 }
                 
                 //check if all hidden values
-                if(maxHeap.heapsize() == 0) {
-                    testCounter = 0;
+                if(maxHeap.heapsize() == 0 || hiddenVals == 8192) {
                     maxHeap.unhide();
+                    maxHeap.buildheap();
+                    hiddenVals = 0;
                 }
                 
             }
@@ -93,10 +95,9 @@ public class Parser {
             toOutputBuffer(currMax);
         }
         if(atLeast8blocks) {
-            int hiddenElems = 8192 - maxHeap.heapsize();
             //unhide arbitray #of hidden objects
-            if(hiddenElems > 0) {
-                maxHeap.unhide(hiddenElems);
+            if(hiddenVals > 0) {
+                maxHeap.unhide(hiddenVals);
                 maxHeap.buildheap();
                 while(maxHeap.heapsize() > 0) {
                     Record currMax = (Record)maxHeap.removemax();
@@ -105,15 +106,78 @@ public class Parser {
             }
         }
         
+        //merge sorting between two files
+        currFile = output;
+        
+        merge(runs);
+        
+        
+        //take at most 8 runs
+        
+        //put into heap of 8
+        
+        //merging for loop into outputbuffer
+        //dump when full, keep going until all 8 are empty
+        
+        //track new run: size = size * 8, offset = 0+size
+        
+        //same for rest until all runs processed
+        
+        //repeat process with new bigger runs, track which direction
+        
+        
         
         
         
     }
     
+        
+    private void merge(ArrayList<RunData> stacks) throws Exception {
+        swapFiles();
+        maxHeap.emptyHeap();
+        int index = 0; 
+        System.out.println(maxHeap.heapsize());
+        while(index < stacks.size() && index < 8*index) {
+            
+            input.seek(stacks.get(index).getOffset());
+            input.read(inputBuffer);
+            int lBound = 0;
+            int rBound = 16;
+            for(int i = 0 ; i < 1024; i++) {
+                Record temp = new Record(Arrays.copyOfRange(inputBuffer, lBound, rBound));
+                lBound += 16;
+                rBound += 16;
+                maxHeap.insert(temp);
+            }         
+            index++;    
+        }//done
+        
+        while (maxHeap.heapsize() > 0) {
+            //removemax
+            //dumptooutputbuffer
+            //ifoutputbuffer full dump to file track run
+            
+            //replace with next from run, if empty load next run
+        }
+
+        
+    }
+    
+    private void swapFiles() {
+        RandomAccessFile temp = input;
+        input = output;
+        output = temp;
+    }
+
+    
+    
     
     private void toOutputBuffer(Record x) throws IOException{
         testCounter++;
         writer.println(x);
+        if(x.getPid() == 173199307468L) {
+
+        }
         if (currOutputIndex < blockSize) {
             byte[] record = x.toBytes();            
             for(int i = 0; i < record.length; i++) {
