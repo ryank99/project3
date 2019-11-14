@@ -108,47 +108,111 @@ public class Parser {
             }
         }
         //adding the final run
-        currRun = runs.get(runs.size()-1);
-        runs.add(new RunData(currRun.getOffset()+currRun.getLength(), currLength));
-        currRun = runs.get(runs.size()-1);
-        
-        //merge sorting between two files
-        currFile = output;
-        
-        merge(runs);
+        if(runs.size() >= 1) {
+            currRun = runs.get(runs.size()-1);
+            runs.add(new RunData(currRun.getOffset()+currRun.getLength(), currLength));
+            currRun = runs.get(runs.size()-1);
+            
+            //merge sorting between two files
+            currFile = output;
+            
+            merge(runs);
+        }
 
     }
     
     //takes some arraylist of <8 runs. returns 1 run sorted in output
-    private RunData combine(ArrayList<RunData> stacks, int outputOff) {
+    private RunData combine(ArrayList<RunData> stacks, int outputOff) throws Exception {
         maxHeap.emptyHeap();
         RunData newRun = new RunData();
-        for(int i = 0; i < stacks.size(); i++) {
-            RunData curr = stacks.get(i);
-            stacks.get(i).incrementB();
+        ArrayList<Integer> counters = new ArrayList<Integer>();
+
+        for(int j = 0; j < stacks.size(); j++) {
+            RunData curr = stacks.get(j);
+            
+            input.seek(curr.getOffset());
+            input.read(inputBuffer);
+            
+            int lBound = 0;
+            int rBound = 16;
+            for(int i = 0 ; i < 1024; i++) {
+                Record temp = new Record(Arrays.copyOfRange(inputBuffer, lBound, rBound), j);
+                lBound += 16;
+                rBound += 16;
+                maxHeap.insert(temp);
+            }
             //pop 1 block from each into heap
-            if(i == stacks.size()-1) {
+            if(j == stacks.size()-1) {
                 newRun = new RunData(outputOff, curr.getOffset()+curr.getLength()-stacks.get(0).getOffset());
             }
+            stacks.get(j).incrementB();
+            counters.add(0);
+        }
+        
+        Record prev;
+        RunData currRun;
+        int flag;
+        while(!empty(stacks)) {
+            
+            prev = (Record)maxHeap.removemax();
+            //toOutputBuffer(prev);
+            flag = prev.getFlag();
+            currRun = stacks.get(flag);
+            
+            //update counter for right run
+            currRun.increment();
+            
+            //we are at the end
+            if(currRun.atEnd()) {
+               currRun.end();
+            }
+            else {
+                if(currRun.getPos()/16 % 1024 == 0) {
+                    input.seek(currRun.getOffset()+currRun.getPos());
+                    int bytesToRead = currRun.getLength()-currRun.getPos();
+                    if(bytesToRead > 1024*16) {
+                        bytesToRead = 1024*16;
+                    }
+                    input.seek(0);
+                    System.out.println(flag);
+                    System.out.println(currRun.getOffset());
+                    System.out.println(currRun.getPos());
+                    System.out.println(bytesToRead);
+
+                    input.read(inputBuffer, currRun.getOffset()+currRun.getPos(), bytesToRead);
+                }
+            }      
         }
         //run mergeing algorithm, refill heap as neccesary
         //dump to file as neccesary
         //newRun should be entirely sorted here
         return newRun;
     }
+    
+    private boolean empty(ArrayList<RunData> count) {
+        for(int i = 0; i < count.size(); i++) {
+            if(count.get(i).atEnd() == false) {
+                return false;
+            }
+        }
+        return true;
+    }
         
     private void merge(ArrayList<RunData> stacks) throws Exception {
         swapFiles();
+        output.seek(0);
+        input.seek(0);
         maxHeap.emptyHeap();
         ArrayList<RunData> newRuns = new ArrayList<RunData>();
         int offset = 0;
-        
+        System.out.println("merging down these runs:");
+        for(int i = 0; i < stacks.size(); i++) {
+            System.out.println(stacks.get(i));
+        }
+        System.out.println("--------------------------");
+
         boolean done = false;
-        while(!done) {
-            for(int i = 0; i < stacks.size(); i++) {
-                System.out.println(stacks.get(i));
-            }
-            System.out.println("--------------------");
+        while(!done) {            
             if(stacks.size() < 8) {
                 RunData last = combine(stacks, offset);
                 offset += last.getLength();
@@ -201,7 +265,6 @@ public class Parser {
         }
         prev = x;
         testCounter+=16;
-        
         
         writer.println(x);
         if(x.getPid() == 173199307468L) {

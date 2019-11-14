@@ -30,8 +30,16 @@ public class RunData {
         return "off: " + offset + " len: " + length;
     }
     
-    public int getCurrOffset() {
+    public int getPos() {
         return currOffset;
+    }
+    
+    public boolean atEnd() {
+        return currOffset == length;
+    }
+    
+    public void end() {
+        currOffset = -1;
     }
     
     public void increment() {
