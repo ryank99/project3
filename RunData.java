@@ -6,6 +6,12 @@ public class RunData {
     private int offset;
     private int length;
     
+    public RunData() {
+        offset = 0;
+        length = 0;
+        currOffset = 0;
+    }
+    
     public RunData(int o, int l) {
         offset = o;
         length = l;
@@ -21,7 +27,7 @@ public class RunData {
     }
     
     public String toString() {
-        return "off: " + offset + " +" + currOffset;
+        return "off: " + offset + " len: " + length;
     }
     
     public int getCurrOffset() {
@@ -30,6 +36,10 @@ public class RunData {
     
     public void increment() {
         currOffset += 16;
+    }
+    
+    public void incrementB() {
+        currOffset += 16384;
     }
 }
 
