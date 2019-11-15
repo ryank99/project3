@@ -1,5 +1,3 @@
-
-
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -27,6 +25,8 @@ public class Parser {
     private RandomAccessFile currFile;
     RunData currRun;
     int currLength = 0;
+    int count = 0;
+
     private Record prev = new Record(0L, 9999.9D);
     
     private PrintWriter writer;
@@ -83,7 +83,7 @@ public class Parser {
                 }
                 
                 //check if all hidden values
-                if(maxHeap.heapsize() == 0 || hiddenVals == 8192) {                    
+                if(maxHeap.heapsize() == 0 || hiddenVals == 8192) {  
                     maxHeap.unhide();
                     maxHeap.buildheap();
                     hiddenVals = 0;
@@ -99,18 +99,20 @@ public class Parser {
         if(atLeast8blocks) {
             //unhide arbitray #of hidden objects
             if(hiddenVals > 0) {
-                maxHeap.unhide(hiddenVals);
+                maxHeap.unhide(hiddenVals*2);
                 maxHeap.buildheap();
                 while(maxHeap.heapsize() > 0) {
                     Record currMax = (Record)maxHeap.removemax();
                     toOutputBuffer(currMax);
                 }
+                //adding the final run
+                currRun = runs.get(runs.size()-1);
+                runs.add(new RunData(currRun.getOffset()+currRun.getLength(), currLength));
+                currRun = runs.get(runs.size()-1);
+                
             }
         }
-        //adding the final run
-        currRun = runs.get(runs.size()-1);
-        runs.add(new RunData(currRun.getOffset()+currRun.getLength(), currLength));
-        currRun = runs.get(runs.size()-1);
+
         
         //merge sorting between two files
         currFile = output;
@@ -120,36 +122,77 @@ public class Parser {
     }
     
     //takes some arraylist of <8 runs. returns 1 run sorted in output
-    private RunData combine(ArrayList<RunData> stacks, int outputOff) {
+    private RunData combine(ArrayList<RunData> stacks, int outputOff) throws IOException {
+        int full = 0;
         maxHeap.emptyHeap();
         RunData newRun = new RunData();
         for(int i = 0; i < stacks.size(); i++) {
             RunData curr = stacks.get(i);
             stacks.get(i).incrementB();
-            //pop 1 block from each into heap
+            
+            //fill inputbuffer with one block from run i
+            input.seek(curr.getOffset());
+            full = input.read(inputBuffer);
+            
+            //pop from inputbuffer to heap
+            for(int j = 0; j < 1024; j++) {
+                Record temp = new Record(Arrays.copyOfRange(inputBuffer, 16*j, 16*j+16));
+                maxHeap.insert(temp);
+            }
+                
             if(i == stacks.size()-1) {
                 newRun = new RunData(outputOff, curr.getOffset()+curr.getLength()-stacks.get(0).getOffset());
             }
         }
-        //run mergeing algorithm, refill heap as neccesary
-        //dump to file as neccesary
-        //newRun should be entirely sorted here
+        Record curr;
+        while(!empty(stacks)) {
+            curr = (Record)maxHeap.removemax();
+            int flag = curr.getFlag();
+            toOutputBuffer(curr);
+            stacks.get(flag).increment();
+            if(stacks.get(flag).getCurrOffset() == stacks.get(flag).getLength()) {
+                stacks.get(flag).end();
+            }
+            else if(stacks.get(flag).getCurrOffset() % 1024 == 0) {
+                loadNextBlock(stacks.get(flag));
+            }
+        }
+        
         return newRun;
     }
-        
-    private void merge(ArrayList<RunData> stacks) throws Exception {
-        swapFiles();
-        maxHeap.emptyHeap();
-        ArrayList<RunData> newRuns = new ArrayList<RunData>();
-        int offset = 0;
-        
-        boolean done = false;
-        while(!done) {
-            for(int i = 0; i < stacks.size(); i++) {
-                System.out.println(stacks.get(i));
+    
+    private void loadNextBlock(RunData curr) throws IOException {
+        System.out.println(maxHeap.heapsize());
+        int pos = curr.getCurrOffset();
+        input.seek(pos + curr.getOffset());
+        input.read(inputBuffer);
+        for(int j = 0; j < 1024; j++) {
+            if(pos < curr.getLength()) {
+                Record temp = new Record(Arrays.copyOfRange(inputBuffer, 16*j, 16*j+16));
+               // maxHeap.insert(temp);
             }
-            System.out.println("--------------------");
-            if(stacks.size() < 8) {
+        }
+    }
+    
+    private boolean empty(ArrayList<RunData> stacks) {
+        for(int i = 0; i < stacks.size(); i++) {
+            if(stacks.get(i).getCurrOffset() != -1) {
+                return false;
+            }
+        }
+        return true;
+    }
+    private void merge(ArrayList<RunData> stacks) throws Exception {
+        maxHeap.emptyHeap();
+        boolean done = false;
+        
+        
+        //runs log8(n) times
+        while(!done) { 
+            swapFiles();
+            ArrayList<RunData> newRuns = new ArrayList<RunData>();
+            int offset = 0;
+            if(stacks.size() <= 8) {
                 RunData last = combine(stacks, offset);
                 offset += last.getLength();
                 newRuns.add(last);
@@ -164,7 +207,7 @@ public class Parser {
                         }
                     }
                     RunData last = combine(curr, offset);
-                    offset+= last.getLength();
+                    offset += last.getLength();
                     newRuns.add(last);
                 }
             }
@@ -186,6 +229,8 @@ public class Parser {
     
     
     private void toOutputBuffer(Record x) throws IOException{
+        count++;
+        //System.out.println(count + " " +x);
         currLength+=16;
         if(x.compareTo(prev) > 0) {
             if(runs.size() == 0) {
@@ -201,12 +246,10 @@ public class Parser {
         }
         prev = x;
         testCounter+=16;
-        
-        
         writer.println(x);
-        if(x.getPid() == 173199307468L) {
+       
 
-        }
+        //copying record bytes into outputbuffer
         if (currOutputIndex < blockSize) {
             byte[] record = x.toBytes();            
             for(int i = 0; i < record.length; i++) {
@@ -218,8 +261,15 @@ public class Parser {
             System.out.println("error");
         }
         if ( currOutputIndex == blockSize) {
+            if(runs.size() == 0) {
+                //System.out.println(currLength % 1024);
+            }
+            else {
+                //System.out.println(outputOffset);
+            }
             dumpToFile();
             currOutputIndex = 0;
+            outputOffset+=1024*16;
         }
         
 
@@ -230,6 +280,11 @@ public class Parser {
     private void dumpToFile() throws IOException {
         output.write(outputBuffer);
         outputOffset += blockSize;
+    }
+    
+    private void dumpToFile(int length) throws IOException {
+        output.write(outputBuffer, 0, length);
+        outputOffset += length;
     }
     
     

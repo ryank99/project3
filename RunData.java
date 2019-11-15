@@ -27,11 +27,19 @@ public class RunData {
     }
     
     public String toString() {
-        return "off: " + offset + " len: " + length;
+        return "off: " + offset + " len: " + length + "\n   "+ ((offset+length)/16);
+    }
+    
+    public int getPos() {
+        return currOffset;
     }
     
     public int getCurrOffset() {
         return currOffset;
+    }
+    
+    public void end() {
+        currOffset = -1;
     }
     
     public void increment() {
